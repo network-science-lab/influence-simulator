@@ -110,10 +110,26 @@ class InfluenceSimulator:
         return func
 
     @staticmethod
+    def relabel_nodes(graph: nx.Graph) -> nx.Graph:
+        """
+        Changes type of node labels to ints.
+        '0' -> 0
+        """
+        mapping = {}
+        for i in range(len(graph)):
+            mapping[str(i)] = i
+
+        return nx.relabel_nodes(graph, mapping)
+
+    @staticmethod
     def load_graph(path: str) -> nx.Graph:
         loading_function = InfluenceSimulator.get_loading_function(path)
         graph = loading_function(path)
-        graph = nx.convert_node_labels_to_integers(graph)
+
+        if isinstance(graph, nx.MultiGraph):
+            graph = nx.Graph(graph)
+
+        graph = InfluenceSimulator.relabel_nodes(graph)
         return graph
 
     def save_result(self, path: str) -> None:
