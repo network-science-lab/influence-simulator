@@ -70,9 +70,13 @@ class InfluenceSimulator:
             peak_iteration=peak.iteration,
         )
 
-    def simulate(self, *, n_jobs: int = 1, verbose: bool = True) -> None:
-        if n_jobs <= 0:
-            n_jobs = None
+    def simulate(
+        self,
+        *,
+        n_jobs: int = 1,
+        chunksize: int = 1,
+        verbose: bool = True,
+    ) -> None:
 
         if n_jobs == 1:
             if verbose:
@@ -82,9 +86,15 @@ class InfluenceSimulator:
 
             self.result = [self.simulate_node(node) for node in nodes]
         else:
-            nodes = self.graph.nodes
+            if n_jobs <= 0:
+                n_jobs = None
+
             self.result = process_map(
-                self.simulate_node, nodes, disable=not verbose
+                self.simulate_node,
+                self.graph.nodes,
+                chunksize=chunksize,
+                max_workers=n_jobs,
+                disable=not verbose,
             )
 
     @staticmethod
