@@ -5,7 +5,7 @@ Package for simulating influence in networks
 
 ## Installation
 ```bash
-pip install git+https://github.com/network-science-lab/influence-simulator
+pip install "influence-simulator[internal] @ git+https://github.com/network-science-lab/influence-simulator"
 ```
 
 
