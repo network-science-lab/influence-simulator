@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from csv import writer as csv_writer
 from typing import NamedTuple
+from warnings import warn
 
 from lightning_diffusion.models import DiffusionModel
 from networkx import Graph
@@ -77,6 +78,9 @@ class InfluenceSimulator(ABC):
             )
 
     def save_result(self, path: str) -> None:
+        if not self.result:
+            warn("Attempting to save empty simulation results.")
+
         with open(path, "wt", encoding="utf-8") as handle:
             writer = csv_writer(handle)
             writer.writerow(SimulationResult._fields)
