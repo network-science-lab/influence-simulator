@@ -1,21 +1,17 @@
 """
 Script for simulating nodes influence in networks. 
-Simulations are run with the Independent Cascade Model
 """
 
+import json
 import logging
+import shutil
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-import numpy as np
-
-from influence_simulator.influence_simulator import InfluenceSimulator
-
-from .utils import log_memory, timer
-
-
-rng = np.random.default_rng()
+from . import simulators
+from .utils import load_graph, log_memory, timer
 
 
 def setup_logging(log_level: str) -> None:
@@ -30,27 +26,36 @@ def setup_logging(log_level: str) -> None:
     )
 
 
-def get_output_file(
-    output_path: str,
-    graph_name: str,
-    infection_probability: float,
-) -> Path:
-    path = Path(output_path)
+def save_archive(
+    model: simulators.InfluenceSimulator,
+    output_dir: Path,
+    graph_file: str,
+    model_config_path: str,
+) -> None:
 
-    if not path.suffix:
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
-        salt = rng.integers(0, 1_000)
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+    graph_name = Path(graph_file).stem
+    output_file = f"{graph_name}_{timestamp}"
 
-        path = (
-            path
-            / graph_name
-            / str(infection_probability)
-            / f"{graph_name}_{infection_probability}_{timestamp}_{salt}.csv"
-        )
+    with TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
 
-        path.parent.mkdir(parents=True, exist_ok=True)
+        model.save_result(temp_dir / "simulation_results.csv")
+        shutil.copy(model_config_path, temp_dir / "model_config.json")
+        shutil.make_archive(output_dir / output_file, "zip", temp_dir)
 
-    return path
+
+def load_simulator(
+    model_config_path: str,
+    graph_path: str,
+) -> simulators.InfluenceSimulator:
+    with open(model_config_path, encoding="utf-8") as handle:
+        config = json.load(handle)
+
+    graph = load_graph(graph_path)
+    model_type = getattr(simulators, config.pop("type"))
+
+    return model_type(graph=graph, **config)
 
 
 def parse_args() -> Namespace:
@@ -58,28 +63,24 @@ def parse_args() -> Namespace:
         description=__doc__,
         formatter_class=RawDescriptionHelpFormatter,
     )
+
     parser.add_argument("graph", type=str, help="Path to saved graph file")
     parser.add_argument(
-        "infection_probability",
-        type=float,
-        help="Independent Cascade Model parameter.",
+        "model_config",
+        type=str,
+        help="Path to a json file containing the configuration for "
+        "the simulation model. File should contain 'type' key with the name "
+        "of the model class and all required keyword arguments.",
     )
 
     parser.add_argument(
         "-o",
-        "--output",
+        "--output-path",
         type=str,
         default="./simulation_results/",
         help="Output path to store the results. If a folder is given "
-        "- whole archive structure will be created in given directory. "
+        "- script will create an archive with the results and model config. "
         "(default: ./simulation_results/)",
-    )
-    parser.add_argument(
-        "-r",
-        "--random-state",
-        type=int,
-        default=None,
-        help="Seed for random number generation. (default: None)",
     )
     parser.add_argument(
         "-n",
@@ -117,17 +118,7 @@ def parse_args() -> Namespace:
 def main(args: Namespace):
     setup_logging(args.log_level)
 
-    simulator = InfluenceSimulator(
-        graph=args.graph,
-        infection_probability=args.infection_probability,
-        random_state=args.random_state,
-    )
-
-    output_file = get_output_file(
-        output_path=args.output,
-        graph_name=Path(args.graph).stem,
-        infection_probability=args.infection_probability,
-    )
+    simulator = load_simulator(args.model_config, args.graph)
 
     simulator.simulate(
         verbose=args.verbose,
@@ -135,7 +126,12 @@ def main(args: Namespace):
         chunksize=args.chunksize,
     )
 
-    simulator.save_result(output_file)
+    output_path = Path(args.output_path)
+    if output_path.suffix:
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        simulator.save_result(output_path)
+    else:
+        save_archive(simulator, output_path, args.graph, args.model_config)
 
 
 def cli():
