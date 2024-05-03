@@ -3,12 +3,6 @@
 Package for simulating influence in networks
 
 
-## Installation
-```bash
-pip install "influence-simulator[internal] @ git+https://github.com/network-science-lab/influence-simulator"
-```
-
-
 ## Usage
 
 ### In code
@@ -49,3 +43,7 @@ influence-simulator \
 }
 ```
 
+## Installation
+```bash
+pip install "influence-simulator[internal] @ git+https://github.com/network-science-lab/influence-simulator"
+```
